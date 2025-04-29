@@ -42,7 +42,8 @@ router.put('/customer_update', authorization, async (req, res, next) => {
   }
 });
 
-// CREATE CREDIT CARD
+// CREDIT CARD CRUD
+// Create
 router.post('/credit_card_create', authorization, async (req, res, next) => {
   try {
     const { card_number, card_holder_name, expiry_date, cvv, billing_address_id, is_default } = req.body;
@@ -57,37 +58,28 @@ router.post('/credit_card_create', authorization, async (req, res, next) => {
         is_default,
       },
     });
-    res.json({ status: 'success', message: 'Credit card info created successfully' });
+    res.json({ status: 'success', message: 'Credit card created successfully' });
   } catch (err) {
     next(err);
   }
 });
-
-// UPDATE CREDIT CARD
+// Update
 router.put('/credit_card_update', authorization, async (req, res, next) => {
   try {
     const { card_id, card_number, card_holder_name, expiry_date, cvv, billing_address_id, is_default } = req.body;
     const result = await prisma.creditCard.updateMany({
       where: { id: card_id, customer_id: req.customer.id },
-      data: {
-        card_number,
-        card_holder_name,
-        expiry_date: new Date(expiry_date),
-        cvv,
-        billing_address_id,
-        is_default,
-      },
+      data: { card_number, card_holder_name, expiry_date: new Date(expiry_date), cvv, billing_address_id, is_default },
     });
     if (result.count === 0) {
       return res.status(404).json({ status: 'fail', message: 'Credit card not found' });
     }
-    res.json({ status: 'success', message: 'Credit card info updated successfully' });
+    res.json({ status: 'success', message: 'Credit card updated successfully' });
   } catch (err) {
     next(err);
   }
 });
-
-// DELETE CREDIT CARD
+// Delete
 router.delete('/credit_card_delete', authorization, async (req, res, next) => {
   try {
     const { card_id } = req.body;
@@ -97,13 +89,12 @@ router.delete('/credit_card_delete', authorization, async (req, res, next) => {
     if (result.count === 0) {
       return res.status(404).json({ status: 'fail', message: 'Credit card not found' });
     }
-    res.json({ status: 'success', message: 'Credit card info deleted successfully' });
+    res.json({ status: 'success', message: 'Credit card deleted successfully' });
   } catch (err) {
     next(err);
   }
 });
-
-// GET ALL CREDIT CARDS
+// List
 router.get('/credit_cards', authorization, async (req, res, next) => {
   try {
     const cards = await prisma.creditCard.findMany({
@@ -118,7 +109,8 @@ router.get('/credit_cards', authorization, async (req, res, next) => {
   }
 });
 
-// CREATE ADDRESS
+// ADDRESS CRUD
+// Create
 router.post('/address_create', authorization, async (req, res, next) => {
   try {
     const { address_type, street_address, city, state, postal_code, country, is_default } = req.body;
@@ -139,8 +131,7 @@ router.post('/address_create', authorization, async (req, res, next) => {
     next(err);
   }
 });
-
-// UPDATE ADDRESS
+// Update
 router.put('/address_update', authorization, async (req, res, next) => {
   try {
     const { address_id, address_type, street_address, city, state, postal_code, country, is_default } = req.body;
@@ -156,8 +147,7 @@ router.put('/address_update', authorization, async (req, res, next) => {
     next(err);
   }
 });
-
-// DELETE ADDRESS
+// Delete
 router.delete('/address_delete', authorization, async (req, res, next) => {
   try {
     const { address_id } = req.body;
@@ -172,8 +162,7 @@ router.delete('/address_delete', authorization, async (req, res, next) => {
     next(err);
   }
 });
-
-// GET ALL ADDRESSES
+// List
 router.get('/addresses', authorization, async (req, res, next) => {
   try {
     const list = await prisma.address.findMany({
@@ -188,7 +177,7 @@ router.get('/addresses', authorization, async (req, res, next) => {
   }
 });
 
-// GET ALL PRODUCTS
+// PRODUCT & SEARCH
 router.get('/products', authorization, async (req, res, next) => {
   try {
     const prods = await prisma.product.findMany();
@@ -200,8 +189,7 @@ router.get('/products', authorization, async (req, res, next) => {
     next(err);
   }
 });
-
-// SEARCH PRODUCTS
+// Search products
 router.get('/api/v1/search_product', authorization, async (req, res, next) => {
   try {
     const { search } = req.query;
@@ -220,25 +208,23 @@ router.get('/api/v1/search_product', authorization, async (req, res, next) => {
   }
 });
 
-// SHOPPING CART
+// SHOPPING CART & CART ITEMS
+// Create cart
 router.post('/shopping_cart_create', authorization, async (req, res, next) => {
   try {
-    await prisma.shoppingCart.create({
-      data: { customer_id: req.customer.id },
-    });
+    await prisma.shoppingCart.create({ data: { customer_id: req.customer.id } });
     res.json({ status: 'success', message: 'Shopping cart created successfully' });
   } catch (err) {
     next(err);
   }
 });
-
-// ADD TO CART
+// Add to cart
 router.post('/api/v1/cart/:product_id/add', authorization, async (req, res, next) => {
   try {
     const product_id = Number(req.params.product_id);
     const { quantity } = req.body;
 
-    // check stock
+    // stock check
     const agg = await prisma.stock.aggregate({
       _sum: { quantity: true },
       where: { product_id },
@@ -248,7 +234,7 @@ router.post('/api/v1/cart/:product_id/add', authorization, async (req, res, next
       return res.status(400).json({ status: 'fail', message: 'Not enough quantity available' });
     }
 
-    // get latest cart
+    // latest cart
     const cart = await prisma.shoppingCart.findFirst({
       where: { customer_id: req.customer.id },
       orderBy: { created_at: 'desc' },
@@ -265,8 +251,7 @@ router.post('/api/v1/cart/:product_id/add', authorization, async (req, res, next
     next(err);
   }
 });
-
-// UPDATE CART ITEM
+// Update cart item
 router.put('/api/v1/cart/:product_id/update', authorization, async (req, res, next) => {
   try {
     const product_id = Number(req.params.product_id);
@@ -290,8 +275,7 @@ router.put('/api/v1/cart/:product_id/update', authorization, async (req, res, ne
     next(err);
   }
 });
-
-// REMOVE FROM CART
+// Remove from cart
 router.delete('/api/v1/cart/:product_id/remove', authorization, async (req, res, next) => {
   try {
     const product_id = Number(req.params.product_id);
@@ -313,8 +297,7 @@ router.delete('/api/v1/cart/:product_id/remove', authorization, async (req, res,
     next(err);
   }
 });
-
-// GET CART ITEMS
+// List cart items
 router.get('/api/v1/cart', authorization, async (req, res, next) => {
   try {
     const cart = await prisma.shoppingCart.findFirst({
@@ -339,7 +322,7 @@ router.post('/order/create', authorization, async (req, res, next) => {
   try {
     const { delivery_type, credit_card_id } = req.body;
 
-    // fetch latest cart & items with prices
+    // load cart items + current prices
     const cart = await prisma.shoppingCart.findFirst({
       where: { customer_id: req.customer.id },
       orderBy: { created_at: 'desc' },
@@ -365,16 +348,16 @@ router.post('/order/create', authorization, async (req, res, next) => {
       return res.status(400).json({ status: 'fail', message: 'No items in cart' });
     }
 
-    // calculate total
+    // compute total
     let total_amount = 0;
     for (const item of cartItems) {
       const price = item.product.prices[0]?.price || 0;
       total_amount += price * item.quantity;
     }
 
-    // transaction: create order, items, adjust stock, delivery, clear cart
-    const order = await prisma.$transaction(async (tx) => {
-      const newOrder = await tx.order.create({
+    // transaction: order, items, stock, warehouse usage, delivery, balance, clear cart
+    const newOrder = await prisma.$transaction(async (tx) => {
+      const o = await tx.order.create({
         data: {
           customer_id: req.customer.id,
           status: 'issued',
@@ -385,21 +368,19 @@ router.post('/order/create', authorization, async (req, res, next) => {
 
       for (const item of cartItems) {
         const price = item.product.prices[0]?.price || 0;
-        // pick a warehouse with stock
         const stockEntry = await tx.stock.findFirst({
           where: { product_id: item.product_id, quantity: { gt: 0 } },
           orderBy: { last_updated: 'asc' },
         });
-        const warehouse_id = stockEntry.warehouse_id;
+        const wid = stockEntry.warehouse_id;
 
-        // create order item
         await tx.orderItem.create({
           data: {
-            order_id: newOrder.id,
+            order_id: o.id,
             product_id: item.product_id,
             quantity: item.quantity,
             unit_price: price,
-            warehouse_id,
+            warehouse_id: wid,
           },
         });
 
@@ -409,10 +390,10 @@ router.post('/order/create', authorization, async (req, res, next) => {
           data: { quantity: stockEntry.quantity - item.quantity },
         });
 
-        // if stock now zero, decrement warehouse usage
+        // adjust warehouse usage if emptied
         if (stockEntry.quantity - item.quantity === 0) {
           await tx.warehouse.update({
-            where: { id: warehouse_id },
+            where: { id: wid },
             data: { current_usage: { decrement: 1 } },
           });
         }
@@ -422,33 +403,83 @@ router.post('/order/create', authorization, async (req, res, next) => {
       if (delivery_type) {
         await tx.deliveryPlan.create({
           data: {
-            order_id: newOrder.id,
+            order_id: o.id,
             delivery_type,
             delivery_price: 5.0,
             ship_date: new Date(),
-            delivery_date: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000),
-            tracking_number: `TRACK-${newOrder.id}`,
+            delivery_date: new Date(Date.now() + 5*24*60*60*1000),
+            tracking_number: `TRACK-${o.id}`,
           },
         });
       }
 
+      // adjust account balance
+      await tx.customer.update({
+        where: { id: req.customer.id },
+        data: { account_balance: { increment: total_amount } },
+      });
+
       // clear cart
       await tx.cartItem.deleteMany({ where: { cart_id: cart.id } });
 
-      return newOrder;
+      return o;
     });
 
     res.json({
       status: 'success',
       message: 'Order created successfully',
-      order_id: order.id,
+      order_id: newOrder.id,
     });
   } catch (err) {
     next(err);
   }
 });
 
-// GET ALL ORDERS
+// CANCEL ORDER
+router.put('/order/cancel/:order_id', authorization, async (req, res, next) => {
+  try {
+    const order_id = Number(req.params.order_id);
+
+    // wrap in transaction
+    await prisma.$transaction(async (tx) => {
+      const ord = await tx.order.findFirst({
+        where: { id: order_id, customer_id: req.customer.id },
+      });
+      if (!ord) throw new Error('Order not found');
+
+      // update status
+      await tx.order.update({
+        where: { id: order_id },
+        data: { status: 'cancelled' },
+      });
+
+      // refund balance
+      await tx.customer.update({
+        where: { id: req.customer.id },
+        data: { account_balance: { decrement: ord.total_amount } },
+      });
+
+      // restore stock
+      const items = await tx.orderItem.findMany({ where: { order_id } });
+      for (const item of items) {
+        await tx.stock.updateMany({
+          where: { product_id: item.product_id },
+          data: { quantity: { increment: item.quantity } },
+        });
+      }
+
+      // delete order items + delivery plan
+      await tx.orderItem.deleteMany({ where: { order_id } });
+      await tx.deliveryPlan.deleteMany({ where: { order_id } });
+    });
+
+    res.json({ status: 'success', message: 'Order cancelled successfully' });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// LIST ORDERS
 router.get('/orders', authorization, async (req, res, next) => {
   try {
     const orders = await prisma.order.findMany({

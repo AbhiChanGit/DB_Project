@@ -1,4 +1,3 @@
-// middleware/authorization.js
 const jwt = require('jsonwebtoken');
 const prisma = require('../prismaClient');
 require('dotenv').config();

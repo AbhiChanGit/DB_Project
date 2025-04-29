@@ -1,4 +1,3 @@
-// middleware/validinfo.js
 const prisma = require('../prismaClient');
 
 module.exports = async (req, res, next) => {

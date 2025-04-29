@@ -1,3 +1,4 @@
+// routes/staffs.js
 const router = require('express').Router();
 const bcrypt = require('bcrypt');
 const prisma = require('../prismaClient');
@@ -33,11 +34,32 @@ router.put('/order_update/:orderId', authorization, async (req, res, next) => {
     const { status } = req.body;
 
     await prisma.$transaction(async (tx) => {
+      const order = await tx.order.findUnique({ where: { id: orderId } });
+      if (!order) throw new Error('Order not found');
+
+      // 1. Update status
       await tx.order.update({
         where: { id: orderId },
         data: { status },
       });
 
+      // 2. If cancelled, refund and restore stock
+      if (status === 'cancelled') {
+        await tx.customer.update({
+          where: { id: order.customer_id },
+          data: { account_balance: { decrement: order.total_amount } },
+        });
+
+        const items = await tx.orderItem.findMany({ where: { order_id: orderId } });
+        for (const item of items) {
+          await tx.stock.updateMany({
+            where: { product_id: item.product_id },
+            data: { quantity: { increment: item.quantity } },
+          });
+        }
+      }
+
+      // 3. If cancelled or delivered, delete items & delivery plan
       if (status === 'cancelled' || status === 'delivered') {
         await tx.orderItem.deleteMany({ where: { order_id: orderId } });
         await tx.deliveryPlan.deleteMany({ where: { order_id: orderId } });
@@ -50,7 +72,8 @@ router.put('/order_update/:orderId', authorization, async (req, res, next) => {
   }
 });
 
-// ADD ADDRESS
+// ADDRESS CRUD
+// Create
 router.post('/:staffId/address/create', authorization, async (req, res, next) => {
   try {
     const { street_address, city, state, postal_code, country } = req.body;
@@ -70,18 +93,15 @@ router.post('/:staffId/address/create', authorization, async (req, res, next) =>
     next(err);
   }
 });
-
-// UPDATE ADDRESS
+// Update
 router.put('/:staffId/address/:addressId/update', authorization, async (req, res, next) => {
   try {
     const addressId = Number(req.params.addressId);
     const { street_address, city, state, postal_code, country } = req.body;
-
     const result = await prisma.address.updateMany({
       where: { id: addressId, user_id: req.user.id },
       data: { street_address, city, state, postal_code, country },
     });
-
     if (result.count === 0) {
       return res.status(404).json({ status: 'fail', message: 'Address not found' });
     }
@@ -90,8 +110,7 @@ router.put('/:staffId/address/:addressId/update', authorization, async (req, res
     next(err);
   }
 });
-
-// DELETE ADDRESS
+// Delete
 router.delete('/:staffId/address/:addressId/delete', authorization, async (req, res, next) => {
   try {
     const addressId = Number(req.params.addressId);
@@ -107,7 +126,8 @@ router.delete('/:staffId/address/:addressId/delete', authorization, async (req, 
   }
 });
 
-// ADD WAREHOUSE
+// WAREHOUSE CRUD
+// Create
 router.post('/:staffId/warehouse/create', authorization, async (req, res, next) => {
   try {
     const { name, address_id, capacity } = req.body;
@@ -119,13 +139,11 @@ router.post('/:staffId/warehouse/create', authorization, async (req, res, next) 
     next(err);
   }
 });
-
-// UPDATE WAREHOUSE
+// Update
 router.put('/:staffId/warehouse/:warehouseId/update', authorization, async (req, res, next) => {
   try {
     const warehouseId = Number(req.params.warehouseId);
     const { name, address_id, capacity } = req.body;
-
     await prisma.warehouse.update({
       where: { id: warehouseId },
       data: { name, address_id, capacity },
@@ -135,8 +153,7 @@ router.put('/:staffId/warehouse/:warehouseId/update', authorization, async (req,
     next(err);
   }
 });
-
-// DELETE WAREHOUSE
+// Delete
 router.delete('/:staffId/warehouse/:warehouseId/delete', authorization, async (req, res, next) => {
   try {
     const warehouseId = Number(req.params.warehouseId);
@@ -147,7 +164,8 @@ router.delete('/:staffId/warehouse/:warehouseId/delete', authorization, async (r
   }
 });
 
-// ADD CATEGORY
+// CATEGORY CRUD
+// Create
 router.post('/:staffId/categories/create', authorization, async (req, res, next) => {
   try {
     const { name, description } = req.body;
@@ -157,13 +175,11 @@ router.post('/:staffId/categories/create', authorization, async (req, res, next)
     next(err);
   }
 });
-
-// UPDATE CATEGORY
+// Update
 router.put('/:staffId/categories/:categoryId/update', authorization, async (req, res, next) => {
   try {
     const categoryId = Number(req.params.categoryId);
     const { name, description } = req.body;
-
     await prisma.category.update({
       where: { id: categoryId },
       data: { name, description },
@@ -173,8 +189,7 @@ router.put('/:staffId/categories/:categoryId/update', authorization, async (req,
     next(err);
   }
 });
-
-// DELETE CATEGORY
+// Delete
 router.delete('/:staffId/categories/:categoryId/delete', authorization, async (req, res, next) => {
   try {
     const categoryId = Number(req.params.categoryId);
@@ -185,40 +200,26 @@ router.delete('/:staffId/categories/:categoryId/delete', authorization, async (r
   }
 });
 
-// CREATE PRODUCT + PRICE + STOCK
+// PRODUCT + PRICE + STOCK
 router.post('/:staffId/products/create', authorization, async (req, res, next) => {
   try {
-    const {
-      name,
-      description,
-      brand,
-      size,
-      category_id,
-      price,
-      product_type,
-      warehouse_id,
-      quantity,
-    } = req.body;
+    const { name, description, brand, size, category_id, price, product_type, warehouse_id, quantity } = req.body;
 
     await prisma.$transaction(async (tx) => {
-      // Check capacity
       const wh = await tx.warehouse.findUnique({ where: { id: warehouse_id } });
       if (!wh) throw new Error('Warehouse not found');
       if (wh.current_usage + quantity > wh.capacity) {
         throw new Error('Warehouse capacity exceeded');
       }
 
-      // Create product
       const prod = await tx.product.create({
         data: { name, description, category_id, brand, product_type, size },
       });
 
-      // Create price
       await tx.productPrice.create({
         data: { product_id: prod.id, price, set_by_staff_id: req.user.id },
       });
 
-      // Create stock
       await tx.stock.create({
         data: {
           product_id: prod.id,
@@ -228,7 +229,6 @@ router.post('/:staffId/products/create', authorization, async (req, res, next) =
         },
       });
 
-      // Update warehouse usage
       await tx.warehouse.update({
         where: { id: warehouse_id },
         data: { current_usage: { increment: quantity } },
@@ -245,8 +245,7 @@ router.post('/:staffId/products/create', authorization, async (req, res, next) =
 router.put('/:staffId/products/:productId/update', authorization, async (req, res, next) => {
   try {
     const productId = Number(req.params.productId);
-    const { name, description, brand, size, category_id, price, product_type } =
-      req.body;
+    const { name, description, brand, size, category_id, price, product_type } = req.body;
 
     await prisma.$transaction([
       prisma.product.update({
@@ -271,19 +270,13 @@ router.delete('/:staffId/products/:productId/delete', authorization, async (req,
     const productId = Number(req.params.productId);
 
     await prisma.$transaction(async (tx) => {
-      // Fetch stock entry
-      const stockEntry = await tx.stock.findFirst({
-        where: { product_id: productId },
-      });
-      if (!stockEntry) throw new Error('Stock not found');
-
-      // Update warehouse usage
-      await tx.warehouse.update({
-        where: { id: stockEntry.warehouse_id },
-        data: { current_usage: { decrement: stockEntry.quantity } },
-      });
-
-      // Delete stock, prices, product
+      const stockEntries = await tx.stock.findMany({ where: { product_id: productId } });
+      for (const entry of stockEntries) {
+        await tx.warehouse.update({
+          where: { id: entry.warehouse_id },
+          data: { current_usage: { decrement: entry.quantity } },
+        });
+      }
       await tx.stock.deleteMany({ where: { product_id: productId } });
       await tx.productPrice.deleteMany({ where: { product_id: productId } });
       await tx.product.delete({ where: { id: productId } });

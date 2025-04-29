@@ -1,4 +1,3 @@
-// middleware/prismaErrorHandler.js
 const { Prisma } = require('@prisma/client');
 
 module.exports = (err, req, res, next) => {
