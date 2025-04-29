@@ -1,538 +1,466 @@
-const router = require("express").Router();
-const db = require("../index");
-const authorization = require("../middleware/authorization");
+const router = require('express').Router();
+const bcrypt = require('bcrypt');
+const prisma = require('../prismaClient');
+const authorization = require('../middleware/authorization');
 
-//check if customer is authorized
-router.get("/customer", authorization, async(req, res) => {
-    try {
-        const users = await db.query("Select * from users where user_id = $1 AND user_type = $2", [req.users.user_id, "customer"]);
-        if (users.rows.length > 0) {
-            res.json(users.rows[0]);
-        } else {
-            res.status(404).json({
-                status: "fail",
-                message: "Unauthorized"
-            })
-        }
-    } catch (err) {
-        console.error(err.message);
-        res.status(500).json({
-            status: "fail",
-            message: "Server Error"
-        })
+// GET CUSTOMER PROFILE
+router.get('/customer', authorization, async (req, res, next) => {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: req.user.id },
+      include: { customer: true },
+    });
+    if (!user || user.user_type !== 'customer') {
+      return res.status(404).json({ status: 'fail', message: 'Unauthorized' });
     }
-})
-
-// update customer info
-router.put("/customer_update", authorization, async(req, res) => {
-    const {email, password, phone} = req.body;
-    try {
-        const salt = await bcrypt.genSalt(10);
-        const hashedPassword = await bcrypt.hash(password, salt);
-        //Start transaction
-        await db.query("BEGIN");
-        //update users table
-        await db.query("UPDATE users SET email = $1, password_hash = $2 WHERE user_id = $3", [email, hashedPassword, req.users.user_id]);
-        //update customer table
-        await db.query("UPDATE customers SET phone_number = $1 WHERE customer_id = $2", [phone, req.customers.user_id]);
-        //Commit transaction
-        await db.query("COMMIT");
-        res.status(200).json({
-            status: "success",
-            message: "Customer info updated successfully"
-        })
-    } catch(err) {
-        console.error(err.message);
-        res.status(500).json({
-            status: "fail",
-            message: "Server Error"
-        })
-    }
-})
-
-//create credit card info
-router.post("/credit_card_create", authorization, async(req, res) => {
-    const {card_number, card_holder_name, expiry_date, cvv, billing_address_id, is_default} = req.body;
-    try {
-        await db.query("BEGIN");
-        //insert credit card info
-        await db.query("INSERT INTO credit_card (customer_id, card_number, card_holder_name, expiry_date, cvv, billing_address_id, is_default) VALUES ($1, $2, $3, $4, $5, $6, $7)", 
-            [req.customers.customer_id, card_number, card_holder_name, expiry_date, cvv, billing_address_id, is_default]);
-        //Commit transaction
-        await db.query("COMMIT");
-        res.status(200).json({
-            status: "success",
-            message: "Credit card info created successfully"
-        })
-    } catch(err) {
-        console.error(err.message);
-        res.status(500).json({
-            status: "fail",
-            message: "Server Error"
-        })
-    }
-})
-
-// update credit card info
-router.put("/credit_card_update", authorization, async(req, res) => {
-    const {card_number, card_holder_name, expiry_date, cvv, billing_address_id, is_default} = req.body;
-    try {
-        await db.query("BEGIN");
-        //update credit card info
-        await db.query("UPDATE credit_card SET card_number = $1, card_holder_name = $2, expiry_date = $3, cvv = $4, billing_address_id = $5, is_default = $6 WHERE customer_id = $7 AND card_id = $8", 
-            [card_number, card_holder_name, expiry_date, cvv, billing_address_id, is_default, req.customers.customer_id, req.credit_cards.card_id]);
-        //Commit transaction
-        await db.query("COMMIT");
-        res.status(200).json({
-            status: "success",
-            message: "Credit card info updated successfully"
-        })
-    } catch(err) {
-        console.error(err.message);
-        res.status(500).json({
-            status: "fail",
-            message: "Server Error"
-        })
-    }
-})
-
-// delete credit card info
-router.delete("/credit_card_delete", authorization, async(req, res) => {
-    try {
-        await db.query("BEGIN");
-        //delete credit card info
-        await db.query("DELETE FROM credit_card WHERE customer_id = $1 AND card_id = $2", [req.customers.customerr_id, req.credit_cards.card_id]);
-        //Commit transaction
-        await db.query("COMMIT");
-        res.status(200).json({
-            status: "success",
-            message: "Credit card info deleted successfully"
-        })
-    } catch(err) {
-        console.error(err.message);
-        res.status(500).json({
-            status: "fail",
-            message: "Server Error"
-        })
-    }
-})
-
-// get all credit cards
-router.get("/credit_cards", authorization, async(req, res) => {
-    try {
-        const credit_cards = await db.query("SELECT * FROM credit_card WHERE customer_id = $1", [req.customers.customer_id]);
-        if (credit_cards.rows.length > 0) {
-            res.json(credit_cards.rows);
-        } else {
-            res.status(404).json({
-                status: "fail",
-                message: "No credit cards found"
-            })
-        }
-    } catch(err) {
-        console.error(err.message);
-        res.status(500).json({
-            status: "fail",
-            message: "Server Error"
-        })
-    }
-})
-
-// create new address
-router.post("/address_create", authorization, async(req, res) => {
-    const {address_type, street_address, city, state, postal_code, country, is_default} = req.body;
-    try {
-        await db.query("BEGIN");
-        //insert address info
-        await db.query("INSERT INTO address (user_id, address_type, street_address, city, state, postal_code, country, is_default) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)", 
-            [req.users.user_id, address_type, street_address, city, state, postal_code, country, is_default]);
-        //Commit transaction
-        await db.query("COMMIT");
-        res.status(200).json({
-            status: "success",
-            message: "Address created successfully"
-        })
-    } catch(err) {
-        console.error(err.message);
-        res.status(500).json({
-            status: "fail",
-            message: "Server Error"
-        })
-    }
-})
-
-// update address info
-router.put("/address_update", authorization, async(req, res) => {
-    const {address_type, street_address, city, state, postal_code, country, is_default} = req.body;
-    try {
-        await db.query("BEGIN");
-        //update address info
-        await db.query("UPDATE address SET address_type = $1, street_address = $2, city = $3, state = $4, postal_code = $5, country = $6, is_default = $7 WHERE user_id = $8 AND address_id = $9", 
-            [address_type, street_address, city, state, postal_code, country, is_default, req.users.user_id, req.addresses.address_id]);
-        //Commit transaction
-        await db.query("COMMIT");
-        res.status(200).json({
-            status: "success",
-            message: "Address updated successfully"
-        })
-    } catch(err) {
-        console.error(err.message);
-        res.status(500).json({
-            status: "fail",
-            message: "Server Error"
-        })
-    }
-})
-
-// delete address info
-router.delete("/address_delete", authorization, async(req, res) => {
-    try {
-        await db.query("BEGIN");
-        //delete address info
-        await db.query("DELETE FROM address WHERE user_id = $1 AND address_id = $2", [req.users.user_id, req.addresses.address_id]);
-        //Commit transaction
-        await db.query("COMMIT");
-        res.status(200).json({
-            status: "success",
-            message: "Address deleted successfully"
-        })
-    } catch(err) {
-        console.error(err.message);
-        res.status(500).json({
-            status: "fail",
-            message: "Server Error"
-        })
-    }
-})
-
-// get all addresses
-router.get("/addresses", authorization, async(req, res) => {
-    try {
-        const addresses = await db.query("SELECT * FROM address WHERE user_id = $1", [req.users.user_id]);
-        if (addresses.rows.length > 0) {
-            res.json(addresses.rows);
-        } else {
-            res.status(404).json({
-                status: "fail",
-                message: "No addresses found"
-            })
-        }
-    } catch(err) {
-        console.error(err.message);
-        res.status(500).json({
-            status: "fail",
-            message: "Server Error"
-        })
-    }
-})
-
-// get all products
-router.get("/products", authorization, async(req, res) => {
-    try {
-        const products = await db.query("SELECT * FROM product");
-        if (products.rows.length > 0) {
-            res.json(products.rows);
-        } else {
-            res.status(404).json({
-                status: "fail",
-                message: "No products found"
-            })
-        }
-    } catch(err) {
-        console.error(err.message);
-        res.status(500).json({
-            status: "fail",
-            message: "Server Error"
-        })
-    }
-})
-
-// search for products
-router.get("/api/v1/search_product", authorization, async(req, res) => {
-    try {
-        const {search} = req.query;
-        const products = await db.query(
-            "SELECT * FROM product WHERE name ILIKE $1 OR brand ILIKE $1 OR product_type ILIKE $1",
-            [`%${search}%`]
-        );
-        res.json(products.rows);
-    } catch (err) {
-        console.error(err.message);
-        res.status(500).json({
-            status: "fail",
-            message: "Server Error"
-        })
-    }
-})
-
-//create shopping cart
-router.post("/shopping_cart_create", authorization, async(req, res) => {
-    try {
-        await db.query("BEGIN");
-        //insert shopping cart info
-        await db.query("INSERT INTO sho pping_carts (customer_id) VALUES ($1)", [req.customers.customer_id]);
-        //Commit transaction
-        await db.query("COMMIT");
-        res.status(200).json({
-            status: "success",
-            message: "Shopping cart created successfully"
-        })
-    } catch(err) {
-        console.error(err.message);
-        res.status(500).json({
-            status: "fail",
-            message: "Server Error"
-        })
-    }
-})
-
-// add product to cart
-router.post("/api/v1/cart/:product_id/add", authorization, async(req, res) => {
-    const {product_id} = req.params.product_id
-    const {quantity} = req.body;
-    try {
-        await db.query("BEGIN");
-
-        //check if product is available in stock
-        const stockCheck = await db.query("SELECT SUM(quantity) AS total_quantity FROM stock WHERE product_id = $1", [product_id]);
-
-        const totalStock = parseInt(stockCheck.rows[0].total_quantity) || 0;
-
-        if (totalStock < quantity) {
-            await db.query("ROLLBACK");
-            return res.status(400).json({
-                status: "fail",
-                message: "Not enough quantity available"
-            })
-        }
-
-        //insert product to cart
-        await db.query("INSERT INTO cart_items (customer_id, product_id, quantity) VALUES ($1, $2, $3)", 
-            [req.customers.customer_id, product_id, quantity]);
-        //Commit transaction
-        await db.query("COMMIT");
-        res.status(200).json({
-            status: "success",
-            message: "Product added to shopping cart successfully"
-        })
-    } catch(err) {
-        console.error(err.message);
-        res.status(500).json({
-            status: "fail",
-            message: "Server Error"
-        })
-    }
-})
-
-// change quantity of product in cart
-router.put("/api/v1/cart/:product_id/update", authorization, async(req, res) => {
-    const {product_id} = req.params.product_id
-    const {quantity} = req.body;
-    try {
-        await db.query("BEGIN");
-        //update product in cart
-        await db.query("UPDATE cart_items SET quantity = $1 WHERE customer_id = $2 AND product_id = $3", 
-            [quantity, req.customers.customer_id, product_id]);
-        //Commit transaction
-        await db.query("COMMIT");
-        res.status(200).json({
-            status: "success",
-            message: "Product quantity updated successfully"
-        })
-    } catch(err) {
-        console.error(err.message);
-        res.status(500).json({
-            status: "fail",
-            message: "Server Error"
-        })
-    }
-})
-
-// remove product from cart
-router.delete("/api/v1/cart/:product_id/remove", authorization, async(req, res) => {
-    const {product_id} = req.params.product_id
-    try {
-        await db.query("BEGIN");
-        //delete product from cart
-        await db.query("DELETE FROM cart_items WHERE customer_id = $1 AND product_id = $2", [req.customers.customer_id, product_id]);
-        //Commit transaction
-        await db.query("COMMIT");
-        res.status(200).json({
-            status: "success",
-            message: "Product removed from shopping cart successfully"
-        })
-    } catch(err) {
-        console.error(err.message);
-        res.status(500).json({
-            status: "fail",
-            message: "Server Error"
-        })
-    }
-})
-
-// get all products in cart
-router.get("/api/v1/cart", authorization, async(req, res) => {
-    try {
-        const cart_items = await db.query("SELECT * FROM cart_items WHERE customer_id = $1", [req.customers.customer_id]);
-        if (cart_items.rows.length > 0) {
-            res.json(cart_items.rows);
-        } else {
-            res.status(404).json({
-                status: "fail",
-                message: "No products found in shopping cart"
-            })
-        }
-    } catch(err) {
-        console.error(err.message);
-        res.status(500).json({
-            status: "fail",
-            message: "Server Error"
-        })
-    }
-})
-
-//create order
-router.post("/order/create", authorization, async(req, res) => {
-    try{
-        await db.query("BEGIN");
-        // get all cart items
-        const cartItemsResult = await db.query(
-            "SELECT ci.product_id, ci.quantity, pp.price FROM cart_items ci JOIN product_prices pp ON ci.product_id = pp.product_id WHERE ci.cart_id = (SELECT cart_id FROM shopping_carts WHERE customer_id = $1) AND pp.end_date IS NULL",
-            [req.customers.customer_id]
-        )
-        const cartItems = cartItemsResult.rows;
-        if (cartItems.length === 0) {
-            await db.query("ROLLBACK");
-            return res.status(400).json({
-                status: "fail",
-                message: "No items in cart"
-            })
-        }
-
-        // calculate total price
-        let total_price = 0;
-        for (let item of cartItems) {
-            total_price += item.price * item.quantity;
-        }
-
-        //create order
-        const newOrder = await db.query(
-            "INSERT INTO orders (customer_id, status, credit_card_id, total_amount) VALUES ($1, 'issued', $2, $3) RETURNING order_id",
-            [req.customers.customer_id, req.credit_cards.ccard_id, total_price]
-        );
-        const order_id = newOrder.rows[0].order_id;
-
-        //check product available in which stock
-        const warehoudeID = await db.query(
-            "SELECT warehouse_id FROM stock WHERE product_id = $1 AND quantity > 0", [product_id]
-        );
-
-        //insert order items
-        for (let item of cartItems) {
-            await db.query(
-                "INSERT INTO order_items (order_id, product_id, quantity, unit_price, warehouse_id) VALUES ($1, $2, $3, $4, $5)",
-                [order_id, item.product_id, item.quantity, total_price, warehoudeID.rows[0].warehouse_id]
-            )
-        }
-
-        //update stock quantity
-        for (let item of cartItems) {
-            await db.query(
-                "UPDATE stock SET quantity = quantity - $1 WHERE product_id = $2 AND warehouse_id = $3 AND quantity >= $1",
-                [item.quantity, item.product_id, warehoudeID.rows[0].warehouse_id]
-            )
-        }
-
-        //clear shopping cart\
-        await db.query(
-            "DELETE FROM cart_items WHERE cart_id = (SELECT cart_id FROM shopping_carts WHERE customer_id = $1)",
-            [req.customers.customer_id]
-        );
-        await db.query("COMMIT");
-        res.status(200).json({
-            status: "success",
-            message: "Order created successfully",
-            order_id: order_id
-        })
-    } catch(err) {
-        await db.query("ROLLBACK");
-        console.error(err.message);
-        res.status(500).json({
-            status: "fail",
-            message: "Server Error"
-        });
-    }
+    res.json(user);
+  } catch (err) {
+    next(err);
+  }
 });
 
-//update order status
-router.put("/order_update/:orderId", authorization, async(req, res) => {
-    const {orderId} = req.params;
-    const {status, delivery_type} = req.body;
-    try {
-        await db.query("BEGIN");
-        //update order status
-        await db.query(
-            "UPDATE orders SET status = $1 WHERE order_id = $2 AND customer_id = $3",
-            [status, orderId, req.customers.customer_id]
-        );
+// UPDATE CUSTOMER INFO
+router.put('/customer_update', authorization, async (req, res, next) => {
+  try {
+    const { email, password, phone } = req.body;
+    const hashed = await bcrypt.hash(password, await bcrypt.genSalt(10));
 
-        //delete if status is cancelled or delivered
-        if (status === 'cancelled' || status === 'delivered') {
-            await db.query(
-                "DELETE FROM order_items WHERE order_id = $1",
-                [orderId]
-            );
-            //delete delivery plan if exists
-            await db.query(
-                "DELETE FROM delivery_plans WHERE order_id = $1",
-                [orderId]
-            );
-        }
+    await prisma.$transaction([
+      prisma.user.update({
+        where: { id: req.user.id },
+        data: { email, password: hashed },
+      }),
+      prisma.customer.update({
+        where: { user_id: req.user.id },
+        data: { phone },
+      }),
+    ]);
 
-        //create delivery plan if status is processing
-        if (status === 'processing') {
-            const deliveryPlan = await db.query(
-                "INSERT INTO delivery_plans (order_id, delivery_type, delivery_price, ship_date, delivery_date, tracking_number) VALUES ($1, $2, $3, NOW(), NOW() + INTERVAL '5 days', $4) RETURNING delivery_plan_id",
-                [orderId, delivery_type, 5.00, `TRACK-${orderId}`]
-            )
-        }
+    res.json({ status: 'success', message: 'Customer info updated successfully' });
+  } catch (err) {
+    next(err);
+  }
+});
 
-        //Commit transaction
-        await db.query("COMMIT");
-        res.status(200).json({
-            status: "success",
-            message: "Order status updated successfully"
-        })
-    } catch(err) {
-        await db.query("ROLLBACK");
-        console.error(err.message);
-        res.status(500).json({
-            status: "fail",
-            message: "Server Error"
-        })
+// CREATE CREDIT CARD
+router.post('/credit_card_create', authorization, async (req, res, next) => {
+  try {
+    const { card_number, card_holder_name, expiry_date, cvv, billing_address_id, is_default } = req.body;
+    await prisma.creditCard.create({
+      data: {
+        customer_id: req.customer.id,
+        card_number,
+        card_holder_name,
+        expiry_date: new Date(expiry_date),
+        cvv,
+        billing_address_id,
+        is_default,
+      },
+    });
+    res.json({ status: 'success', message: 'Credit card info created successfully' });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// UPDATE CREDIT CARD
+router.put('/credit_card_update', authorization, async (req, res, next) => {
+  try {
+    const { card_id, card_number, card_holder_name, expiry_date, cvv, billing_address_id, is_default } = req.body;
+    const result = await prisma.creditCard.updateMany({
+      where: { id: card_id, customer_id: req.customer.id },
+      data: {
+        card_number,
+        card_holder_name,
+        expiry_date: new Date(expiry_date),
+        cvv,
+        billing_address_id,
+        is_default,
+      },
+    });
+    if (result.count === 0) {
+      return res.status(404).json({ status: 'fail', message: 'Credit card not found' });
     }
-})
+    res.json({ status: 'success', message: 'Credit card info updated successfully' });
+  } catch (err) {
+    next(err);
+  }
+});
 
-//get all order
-router.get("/orders", authorization, async(req, res) => {
-    try {
-        const orders = await db.query("SELECT * FROM orders WHERE customer_id = $1", [req.customers.customer_id]);
-        if (orders.rows.length > 0) {
-            res.json(orders.rows);
-        } else {
-            res.status(404).json({
-                status: "fail",
-                message: "No orders found"
-            })
-        }
-    } catch(err) {
-        console.error(err.message);
-        res.status(500).json({
-            status: "fail",
-            message: "Server Error"
-        })
+// DELETE CREDIT CARD
+router.delete('/credit_card_delete', authorization, async (req, res, next) => {
+  try {
+    const { card_id } = req.body;
+    const result = await prisma.creditCard.deleteMany({
+      where: { id: card_id, customer_id: req.customer.id },
+    });
+    if (result.count === 0) {
+      return res.status(404).json({ status: 'fail', message: 'Credit card not found' });
     }
-})
+    res.json({ status: 'success', message: 'Credit card info deleted successfully' });
+  } catch (err) {
+    next(err);
+  }
+});
 
+// GET ALL CREDIT CARDS
+router.get('/credit_cards', authorization, async (req, res, next) => {
+  try {
+    const cards = await prisma.creditCard.findMany({
+      where: { customer_id: req.customer.id },
+    });
+    if (!cards.length) {
+      return res.status(404).json({ status: 'fail', message: 'No credit cards found' });
+    }
+    res.json(cards);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// CREATE ADDRESS
+router.post('/address_create', authorization, async (req, res, next) => {
+  try {
+    const { address_type, street_address, city, state, postal_code, country, is_default } = req.body;
+    await prisma.address.create({
+      data: {
+        user_id: req.user.id,
+        address_type,
+        street_address,
+        city,
+        state,
+        postal_code,
+        country,
+        is_default,
+      },
+    });
+    res.json({ status: 'success', message: 'Address created successfully' });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// UPDATE ADDRESS
+router.put('/address_update', authorization, async (req, res, next) => {
+  try {
+    const { address_id, address_type, street_address, city, state, postal_code, country, is_default } = req.body;
+    const result = await prisma.address.updateMany({
+      where: { id: address_id, user_id: req.user.id },
+      data: { address_type, street_address, city, state, postal_code, country, is_default },
+    });
+    if (result.count === 0) {
+      return res.status(404).json({ status: 'fail', message: 'Address not found' });
+    }
+    res.json({ status: 'success', message: 'Address updated successfully' });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// DELETE ADDRESS
+router.delete('/address_delete', authorization, async (req, res, next) => {
+  try {
+    const { address_id } = req.body;
+    const result = await prisma.address.deleteMany({
+      where: { id: address_id, user_id: req.user.id },
+    });
+    if (result.count === 0) {
+      return res.status(404).json({ status: 'fail', message: 'Address not found' });
+    }
+    res.json({ status: 'success', message: 'Address deleted successfully' });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// GET ALL ADDRESSES
+router.get('/addresses', authorization, async (req, res, next) => {
+  try {
+    const list = await prisma.address.findMany({
+      where: { user_id: req.user.id },
+    });
+    if (!list.length) {
+      return res.status(404).json({ status: 'fail', message: 'No addresses found' });
+    }
+    res.json(list);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// GET ALL PRODUCTS
+router.get('/products', authorization, async (req, res, next) => {
+  try {
+    const prods = await prisma.product.findMany();
+    if (!prods.length) {
+      return res.status(404).json({ status: 'fail', message: 'No products found' });
+    }
+    res.json(prods);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// SEARCH PRODUCTS
+router.get('/api/v1/search_product', authorization, async (req, res, next) => {
+  try {
+    const { search } = req.query;
+    const prods = await prisma.product.findMany({
+      where: {
+        OR: [
+          { name: { contains: search, mode: 'insensitive' } },
+          { brand: { contains: search, mode: 'insensitive' } },
+          { product_type: { contains: search, mode: 'insensitive' } },
+        ],
+      },
+    });
+    res.json(prods);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// SHOPPING CART
+router.post('/shopping_cart_create', authorization, async (req, res, next) => {
+  try {
+    await prisma.shoppingCart.create({
+      data: { customer_id: req.customer.id },
+    });
+    res.json({ status: 'success', message: 'Shopping cart created successfully' });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ADD TO CART
+router.post('/api/v1/cart/:product_id/add', authorization, async (req, res, next) => {
+  try {
+    const product_id = Number(req.params.product_id);
+    const { quantity } = req.body;
+
+    // check stock
+    const agg = await prisma.stock.aggregate({
+      _sum: { quantity: true },
+      where: { product_id },
+    });
+    const totalStock = agg._sum.quantity || 0;
+    if (totalStock < quantity) {
+      return res.status(400).json({ status: 'fail', message: 'Not enough quantity available' });
+    }
+
+    // get latest cart
+    const cart = await prisma.shoppingCart.findFirst({
+      where: { customer_id: req.customer.id },
+      orderBy: { created_at: 'desc' },
+    });
+    if (!cart) {
+      return res.status(404).json({ status: 'fail', message: 'No shopping cart found' });
+    }
+
+    await prisma.cartItem.create({
+      data: { cart_id: cart.id, product_id, quantity },
+    });
+    res.json({ status: 'success', message: 'Product added to shopping cart successfully' });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// UPDATE CART ITEM
+router.put('/api/v1/cart/:product_id/update', authorization, async (req, res, next) => {
+  try {
+    const product_id = Number(req.params.product_id);
+    const { quantity } = req.body;
+    const cart = await prisma.shoppingCart.findFirst({
+      where: { customer_id: req.customer.id },
+      orderBy: { created_at: 'desc' },
+    });
+    if (!cart) {
+      return res.status(404).json({ status: 'fail', message: 'No shopping cart found' });
+    }
+    const result = await prisma.cartItem.updateMany({
+      where: { cart_id: cart.id, product_id },
+      data: { quantity },
+    });
+    if (result.count === 0) {
+      return res.status(404).json({ status: 'fail', message: 'Cart item not found' });
+    }
+    res.json({ status: 'success', message: 'Product quantity updated successfully' });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// REMOVE FROM CART
+router.delete('/api/v1/cart/:product_id/remove', authorization, async (req, res, next) => {
+  try {
+    const product_id = Number(req.params.product_id);
+    const cart = await prisma.shoppingCart.findFirst({
+      where: { customer_id: req.customer.id },
+      orderBy: { created_at: 'desc' },
+    });
+    if (!cart) {
+      return res.status(404).json({ status: 'fail', message: 'No shopping cart found' });
+    }
+    const result = await prisma.cartItem.deleteMany({
+      where: { cart_id: cart.id, product_id },
+    });
+    if (result.count === 0) {
+      return res.status(404).json({ status: 'fail', message: 'Cart item not found' });
+    }
+    res.json({ status: 'success', message: 'Product removed from shopping cart successfully' });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// GET CART ITEMS
+router.get('/api/v1/cart', authorization, async (req, res, next) => {
+  try {
+    const cart = await prisma.shoppingCart.findFirst({
+      where: { customer_id: req.customer.id },
+      orderBy: { created_at: 'desc' },
+    });
+    if (!cart) {
+      return res.status(404).json({ status: 'fail', message: 'No shopping cart found' });
+    }
+    const items = await prisma.cartItem.findMany({ where: { cart_id: cart.id } });
+    if (!items.length) {
+      return res.status(404).json({ status: 'fail', message: 'No products found in shopping cart' });
+    }
+    res.json(items);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// CREATE ORDER
+router.post('/order/create', authorization, async (req, res, next) => {
+  try {
+    const { delivery_type, credit_card_id } = req.body;
+
+    // fetch latest cart & items with prices
+    const cart = await prisma.shoppingCart.findFirst({
+      where: { customer_id: req.customer.id },
+      orderBy: { created_at: 'desc' },
+    });
+    if (!cart) {
+      return res.status(400).json({ status: 'fail', message: 'No items in cart' });
+    }
+    const cartItems = await prisma.cartItem.findMany({
+      where: { cart_id: cart.id },
+      include: {
+        product: {
+          include: {
+            prices: {
+              where: { end_date: null },
+              orderBy: { start_date: 'desc' },
+              take: 1,
+            },
+          },
+        },
+      },
+    });
+    if (!cartItems.length) {
+      return res.status(400).json({ status: 'fail', message: 'No items in cart' });
+    }
+
+    // calculate total
+    let total_amount = 0;
+    for (const item of cartItems) {
+      const price = item.product.prices[0]?.price || 0;
+      total_amount += price * item.quantity;
+    }
+
+    // transaction: create order, items, adjust stock, delivery, clear cart
+    const order = await prisma.$transaction(async (tx) => {
+      const newOrder = await tx.order.create({
+        data: {
+          customer_id: req.customer.id,
+          status: 'issued',
+          credit_card_id,
+          total_amount,
+        },
+      });
+
+      for (const item of cartItems) {
+        const price = item.product.prices[0]?.price || 0;
+        // pick a warehouse with stock
+        const stockEntry = await tx.stock.findFirst({
+          where: { product_id: item.product_id, quantity: { gt: 0 } },
+          orderBy: { last_updated: 'asc' },
+        });
+        const warehouse_id = stockEntry.warehouse_id;
+
+        // create order item
+        await tx.orderItem.create({
+          data: {
+            order_id: newOrder.id,
+            product_id: item.product_id,
+            quantity: item.quantity,
+            unit_price: price,
+            warehouse_id,
+          },
+        });
+
+        // decrement stock
+        await tx.stock.update({
+          where: { id: stockEntry.id },
+          data: { quantity: stockEntry.quantity - item.quantity },
+        });
+
+        // if stock now zero, decrement warehouse usage
+        if (stockEntry.quantity - item.quantity === 0) {
+          await tx.warehouse.update({
+            where: { id: warehouse_id },
+            data: { current_usage: { decrement: 1 } },
+          });
+        }
+      }
+
+      // optional delivery plan
+      if (delivery_type) {
+        await tx.deliveryPlan.create({
+          data: {
+            order_id: newOrder.id,
+            delivery_type,
+            delivery_price: 5.0,
+            ship_date: new Date(),
+            delivery_date: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000),
+            tracking_number: `TRACK-${newOrder.id}`,
+          },
+        });
+      }
+
+      // clear cart
+      await tx.cartItem.deleteMany({ where: { cart_id: cart.id } });
+
+      return newOrder;
+    });
+
+    res.json({
+      status: 'success',
+      message: 'Order created successfully',
+      order_id: order.id,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// GET ALL ORDERS
+router.get('/orders', authorization, async (req, res, next) => {
+  try {
+    const orders = await prisma.order.findMany({
+      where: { customer_id: req.customer.id },
+    });
+    if (!orders.length) {
+      return res.status(404).json({ status: 'fail', message: 'No orders found' });
+    }
+    res.json(orders);
+  } catch (err) {
+    next(err);
+  }
+});
 
 module.exports = router;
