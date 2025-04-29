@@ -393,6 +393,7 @@ router.get("/api/v1/cart", authorization, async(req, res) => {
 
 //create order
 router.post("/order/create", authorization, async(req, res) => {
+    const {delivery_type} = req.body;
     try{
         await db.query("BEGIN");
         // get all cart items
@@ -437,11 +438,29 @@ router.post("/order/create", authorization, async(req, res) => {
 
         //update stock quantity
         for (let item of cartItems) {
-            await db.query(
+            const stockResult = await db.query(
                 "UPDATE stock SET quantity = quantity - $1 WHERE product_id = $2 AND warehouse_id = $3 AND quantity >= $1",
                 [item.quantity, item.product_id, warehoudeID.rows[0].warehouse_id]
             )
         }
+        const updatedStockCount = stockResult.rows[0].quantity;
+        if (updatedStockCount === 0) {
+            await db.queyr("UPDATE warehouse SET current_usage = current_usage - 1 WHERE warehouse_id = $1", [warehoudeID.rows[0].warehouse_id]);
+        }
+
+        //choose delivery type and create delivery plan 
+        if (delivery_type) {
+            const deliveryPlan = await db.query(
+                "INSERT INTO delivery_plans (order_id, delivery_type, delivery_price, ship_date, delivery_date, tracking_number) VALUES ($1, $2, $3, NOW(), NOW() + INTERVAL '5 days', $4) RETURNING delivery_plan_id",
+                [order_id, delivery_type, 5.00, `TRACK-${order_id}`]
+            )
+        }
+
+        //adjust account balance
+        await db.query(
+            "UPDATE customers SET account_balance = account_balance + $1 WHERE customer_id = $2",
+            [total_price, req.customers.customer_id]
+        );
 
         //clear shopping cart\
         await db.query(
@@ -464,54 +483,71 @@ router.post("/order/create", authorization, async(req, res) => {
     }
 });
 
-//update order status
-router.put("/order_update/:orderId", authorization, async(req, res) => {
-    const {orderId} = req.params;
-    const {status, delivery_type} = req.body;
+//cancel order
+router.put("/order/cancel/:order_id", authorization, async(req, res) => {
+    const {order_id} = req.params;
     try {
         await db.query("BEGIN");
-        //update order status
+        //check if order exists and belongs to customer
+        const orderCheck = await db.query("SELECT * FROM orders WHERE order_id = $1 AND customer_id = $2", [order_id, req.customers.customer_id]);
+        if (orderCheck.rows.length === 0) {
+            await db.query("ROLLBACK");
+            return res.status(404).json({
+                status: "fail",
+                message: "Order not found"
+            });
+        }
+
+        //update order status to cancelled
+        await db.query("UPDATE orders SET status = 'cancelled' WHERE order_id = $1", [order_id]);
+
+        //refund account balance
+        const totalAmount = orderCheck.rows[0].total_amount;
         await db.query(
-            "UPDATE orders SET status = $1 WHERE order_id = $2 AND customer_id = $3",
-            [status, orderId, req.customers.customer_id]
+            "UPDATE customers SET account_balance = account_balance - $1 WHERE customer_id = $2",
+            [totalAmount, req.customers.customer_id]
         );
 
-        //delete if status is cancelled or delivered
-        if (status === 'cancelled' || status === 'delivered') {
-            await db.query(
-                "DELETE FROM order_items WHERE order_id = $1",
-                [orderId]
-            );
-            //delete delivery plan if exists
-            await db.query(
-                "DELETE FROM delivery_plans WHERE order_id = $1",
-                [orderId]
-            );
-        }
-
-        //create delivery plan if status is processing
-        if (status === 'processing') {
-            const deliveryPlan = await db.query(
-                "INSERT INTO delivery_plans (order_id, delivery_type, delivery_price, ship_date, delivery_date, tracking_number) VALUES ($1, $2, $3, NOW(), NOW() + INTERVAL '5 days', $4) RETURNING delivery_plan_id",
-                [orderId, delivery_type, 5.00, `TRACK-${orderId}`]
+        //update stock quantity
+        const orderItemsResult = await db.query(
+            "SELECT product_id, quantity FROM order_items WHERE order_id = $1",
+            [order_id]
+        )
+        const orderItems = orderItemsResult.rows;
+        for (let item of orderItems) {
+            const stockResult = await db.query(
+                "UPDATE stock SET quantity = quantity + $1 WHERE product_id = $2",
+                [item.quantity, item.product_id]
             )
         }
+
+        //delete order items
+        await db.query(
+            "DELETE FROM order_items WHERE order_id = $1",
+            [order_id]
+        );
+        //delete delivery plan if exists
+        await db.query(
+            "DELETE FROM delivery_plans WHERE order_id = $1",
+            [order_id]
+        );
 
         //Commit transaction
         await db.query("COMMIT");
         res.status(200).json({
             status: "success",
-            message: "Order status updated successfully"
-        })
+            message: "Order cancelled successfully"
+        });
     } catch(err) {
         await db.query("ROLLBACK");
         console.error(err.message);
         res.status(500).json({
             status: "fail",
             message: "Server Error"
-        })
+        });
     }
-})
+});
+
 
 //get all order
 router.get("/orders", authorization, async(req, res) => {
