@@ -1,42 +1,42 @@
-const router = require('express').Router();
-const bcrypt = require('bcrypt');
+const router       = require('express').Router();
+const bcrypt       = require('bcrypt');
 const jwtGenerator = require('../services/utils/jwtGenerator');
-const validInfo = require('../middleware/validinfo');
-const prisma = require('../../../prismaClient');
-const nodemailer = require('nodemailer');
-const authorization = require('../middleware/authorization');
-const { Prisma } = require('@prisma/client');
+const validInfo    = require('../middleware/validinfo');
+const prisma       = require('../../../prismaClient');
+const nodemailer   = require('nodemailer');
 
-const { Prisma } = require('@prisma/client');
-
-
+// In-memory store for pending verification codes
 const userDataStorage = {};
 
-// send email helper
-const sendVerificationCode = async (email, code) => {
+
+// Helpers
+async function sendVerificationCode(email, code) {
   const transporter = nodemailer.createTransport({
     service: 'gmail',
     auth: {
-      user: 'luudang04@gmail.com',
-      pass: 'begb lrfn rzfv pswu'
+      user: 'your@gmail.com',
+      pass: 'your-app-password',
     },
   });
   await transporter.sendMail({
-    from: 'luudang04@gmail.com',
+    from: 'your@gmail.com',
     to: email,
     subject: 'Verification Code',
-    text: `Your verification code is ${code}. It is valid for 10 minutes.`
+    text: `Your verification code is ${code}. It is valid for 10 minutes.`,
   });
-};
+}
 
-const generateVerificationCode = () =>
-  Math.floor(100000 + Math.random() * 900000).toString();
+function generateVerificationCode() {
+  return Math.floor(100000 + Math.random() * 900000).toString();
+}
 
-// login
+
+// POST
 router.post('/login', validInfo, async (req, res, next) => {
   try {
     const { email, password, user_type } = req.body;
 
+    // 1) Find the user
     const user = await prisma.user.findFirst({
       where: { email, user_type }
     });
@@ -44,66 +44,73 @@ router.post('/login', validInfo, async (req, res, next) => {
       return res.status(401).json({ status: 'fail', message: 'Invalid credentials' });
     }
 
-    const validPassword = await bcrypt.compare(password, user.password);
-    if (!validPassword) {
+    // 2) Check password
+    const valid = await bcrypt.compare(password, user.password);
+    if (!valid) {
       return res.status(401).json({ status: 'fail', message: 'Invalid credentials' });
     }
 
-    const token = jwtGenerator(user.id);
-    res.json({ jwToken: token });
+    // 3) Sign a token
+    const jwToken = jwtGenerator(user.id);
+    return res.json({ jwToken });
   } catch (err) {
     next(err);
   }
 });
 
-// signup
+
+// POST
 router.post('/signup', validInfo, async (req, res, next) => {
   try {
-    const { first_name, last_name, phone, email, password, user_type, salary, job_title, hire_date } = req.body;
+    const {
+      first_name, last_name, phone,
+      email, password, user_type,
+      salary, job_title, hire_date
+    } = req.body;
 
+    // 1) Check for existing email
     const exists = await prisma.user.findUnique({ where: { email } });
     if (exists) {
       return res.status(409).json({ status: 'fail', message: 'User already exists' });
     }
 
-    const salt = await bcrypt.genSalt(10);
-    const hashed = await bcrypt.hash(password, salt);
+    // 2) Hash password
+    const salt  = await bcrypt.genSalt(10);
+    const hash  = await bcrypt.hash(password, salt);
 
-    // generate unique username
-    const base = email.split('@')[0];
+    // 3) Build unique username
+    let base = email.split('@')[0];
     let username = base;
     let counter = 1;
     while (await prisma.user.findUnique({ where: { username } })) {
       username = `${base}${counter++}`;
     }
 
+    // 4) Generate & email code
     const code = generateVerificationCode();
     await sendVerificationCode(email, code);
-
     userDataStorage[email] = {
       first_name, last_name, phone,
-      email, password: hashed, user_type,
+      email, password: hash, user_type,
       username, salary, job_title, hire_date,
       code,
     };
 
-    // upsert verifying table via raw SQL
-    await prisma.$executeRaw`DELETE FROM verifying WHERE email = ${email}`;
-    await prisma.$executeRaw`INSERT INTO verifying (email, code) VALUES (${email}, ${code})`;
+    // 5) Store in verifying table
+    await prisma.verifying.deleteMany({ where: { email } });
+    await prisma.verifying.create({ data: { email, code } });
 
-    res.json({
+    return res.json({
       status: 'success',
       message: 'Verification code sent; valid for 10 minutes.',
-      userDataStorage: userDataStorage[email],
-      message: 'Verification code sent; valid for 10 minutes.',
-      userDataStorage: userDataStorage[email]
     });
   } catch (err) {
     next(err);
   }
 });
 
-// verify signup
+
+// POST
 router.post('/verify-signup', async (req, res, next) => {
   try {
     const { email, code } = req.body;
@@ -112,112 +119,63 @@ router.post('/verify-signup', async (req, res, next) => {
       return res.status(400).json({ status: 'fail', message: 'No sign-up data for this email.' });
     }
 
-    // Check if code matches what's in DB
-    const rows = await prisma.$queryRaw`
-      SELECT * FROM verifying WHERE email = ${email} AND code = ${code}
-    `;
-    // Check if code matches what's in DB
-    const rows = await prisma.$queryRaw`
-      SELECT * FROM verifying WHERE email = ${email} AND code = ${code}
-    `;
-    if (!rows.length) {
+    // 1) Check code
+    const match = await prisma.verifying.findFirst({ where: { email, code } });
+    if (!match) {
       return res.status(400).json({ status: 'fail', message: 'Invalid verification code.' });
     }
 
-    // Final check: does the user already exist?
-    const existingUser = await prisma.user.findUnique({ where: { email: stored.email } });
-    if (existingUser) {
-      delete userDataStorage[email];
-      await prisma.$executeRaw`DELETE FROM verifying WHERE email = ${email}`;
-      return res.status(409).json({ status: 'fail', message: 'User already exists' });
-    }
-
-    // Create User
-    // Final check: does the user already exist?
-    const existingUser = await prisma.user.findUnique({ where: { email: stored.email } });
-    if (existingUser) {
-      delete userDataStorage[email];
-      await prisma.$executeRaw`DELETE FROM verifying WHERE email = ${email}`;
-      return res.status(409).json({ status: 'fail', message: 'User already exists' });
-    }
-
-    // Create User
+    // 2) Create user
     const user = await prisma.user.create({
       data: {
-        username: stored.username,
-        password: stored.password,
-        email: stored.email,
+        username:  stored.username,
+        password:  stored.password,
+        email:     stored.email,
         user_type: stored.user_type,
-      },
-      },
+      }
     });
 
-    // Create profile
-    // Create profile
+    // 3) Create profile record
     if (stored.user_type === 'customer') {
       await prisma.customer.create({
         data: {
-          customer_id: user.id,
-          first_name: stored.first_name,
-          last_name: stored.last_name,
-          phone: stored.phone,
-          account_balance: new Prisma.Decimal(0.00) 
-        },
-          account_balance: new Prisma.Decimal(0.00) 
-        },
+          user_id:         user.id,
+          first_name:      stored.first_name,
+          last_name:       stored.last_name,
+          phone:           stored.phone,
+          account_balance: 0.0,
+        }
       });
-    } 
-    else if (stored.user_type === 'staff') {
-    } 
-    else if (stored.user_type === 'staff') {
+    } else {
       await prisma.staff.create({
         data: {
-          staff_id: user.id, // must match the related user's id
+          user_id:   user.id,
           first_name: stored.first_name,
-          last_name: stored.last_name,
-          phone: stored.phone,
-          salary: new Prisma.Decimal(stored.salary),
-          job_title: stored.job_title,
-          hire_date: new Date(stored.hire_date),
-        },
-        },
+          last_name:  stored.last_name,
+          phone:      stored.phone,
+          salary:     parseFloat(stored.salary),
+          job_title:  stored.job_title,
+          hire_date:  new Date(stored.hire_date),
+        }
       });
     }
 
-    // Cleanup
-    // Cleanup
+    // 4) Cleanup & respond
     delete userDataStorage[email];
-    await prisma.$executeRaw`DELETE FROM verifying WHERE email = ${email}`;
+    await prisma.verifying.deleteMany({ where: { email } });
 
-    // Send token
-    // Send token
-    const token = jwtGenerator(user.id);
-    res.json({ jwToken: token });
-
-
+    const jwToken = jwtGenerator(user.id);
+    return res.json({ jwToken });
   } catch (err) {
     if (err.code === 'P2002') {
       return res.status(409).json({ status: 'fail', message: 'Email or username already taken' });
     }
-    res.status(500).json({ 
-      status: 'error', 
-      message: 'Internal server error',
-      error: err.message 
-    });
-    if (err.code === 'P2002') {
-      return res.status(409).json({ status: 'fail', message: 'Email or username already taken' });
-    }
-    res.status(500).json({ 
-      status: 'error', 
-      message: 'Internal server error',
-      error: err.message 
-    });
+    next(err);
   }
 });
 
 
-
-// forgot password
+// POST
 router.post('/forgot-password', validInfo, async (req, res, next) => {
   try {
     const { email, password } = req.body;
@@ -226,23 +184,25 @@ router.post('/forgot-password', validInfo, async (req, res, next) => {
       return res.status(404).json({ status: 'fail', message: 'Email not found' });
     }
 
-    const salt = await bcrypt.genSalt(10);
-    const hashed = await bcrypt.hash(password, salt);
-
-    const code = generateVerificationCode();
+    // 1) Hash new password & send code
+    const salt  = await bcrypt.genSalt(10);
+    const hash  = await bcrypt.hash(password, salt);
+    const code  = generateVerificationCode();
     await sendVerificationCode(email, code);
-    userDataStorage[email] = { password: hashed };
+    userDataStorage[email] = { password: hash };
 
-    await prisma.$executeRaw`DELETE FROM verifying WHERE email = ${email}`;
-    await prisma.$executeRaw`INSERT INTO verifying (email, code) VALUES (${email}, ${code})`;
+    // 2) Store code
+    await prisma.verifying.deleteMany({ where: { email } });
+    await prisma.verifying.create({ data: { email, code } });
 
-    res.json({ status: 'success', message: 'Verification code sent' });
+    return res.json({ status: 'success', message: 'Verification code sent' });
   } catch (err) {
     next(err);
   }
 });
 
-// verify forgot password
+
+// PUT
 router.put('/verify-forgot-password', async (req, res, next) => {
   try {
     const { email, code } = req.body;
@@ -251,25 +211,29 @@ router.put('/verify-forgot-password', async (req, res, next) => {
       return res.status(400).json({ status: 'fail', message: 'No reset data for this email.' });
     }
 
-    const rows = await prisma.$queryRaw`SELECT * FROM verifying WHERE email = ${email} AND code = ${code}`;
-    if (!rows.length) {
+    // Validate code
+    const match = await prisma.verifying.findFirst({ where: { email, code } });
+    if (!match) {
       return res.status(400).json({ status: 'fail', message: 'Invalid verification code.' });
     }
 
+    // Update password
     await prisma.user.update({
       where: { email },
-      data: { password: stored.password },
+      data:  { password: stored.password }
     });
-    delete userDataStorage[email];
-    await prisma.$executeRaw`DELETE FROM verifying WHERE email = ${email}`;
 
-    res.json({ status: 'success', message: 'Password updated successfully' });
+    delete userDataStorage[email];
+    await prisma.verifying.deleteMany({ where: { email } });
+    return res.json({ status: 'success', message: 'Password updated successfully' });
   } catch (err) {
     next(err);
   }
 });
 
-// check auth
+
+// GET
+const authorization = require('../middleware/authorization');
 router.get('/is-verify', authorization, (_req, res) => {
   res.json(true);
 });
