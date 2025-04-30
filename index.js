@@ -25,4 +25,4 @@ if (require.main === module) {
   process.stdin.resume();
 }
 
-module.exports = {}; // nothing to export—Prisma client lives in prismaClient.js
+module.exports = {};
