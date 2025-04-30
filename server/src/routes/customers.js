@@ -1,6 +1,6 @@
 const router = require('express').Router();
 const bcrypt = require('bcrypt');
-const prisma = require('../prismaClient');
+const prisma = require('../../../prismaClient');
 const authorization = require('../middleware/authorization');
 
 // GET CUSTOMER PROFILE

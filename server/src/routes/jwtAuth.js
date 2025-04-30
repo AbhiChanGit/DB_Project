@@ -1,11 +1,11 @@
-// routes/jwtAuth.js
 const router = require('express').Router();
 const bcrypt = require('bcrypt');
-const jwtGenerator = require('../utils/jwtGenerator');
+const jwtGenerator = require('../services/utils/jwtGenerator');
 const validInfo = require('../middleware/validinfo');
-const prisma = require('../prismaClient');
+const prisma = require('../../../prismaClient');
 const nodemailer = require('nodemailer');
-const generateQRCode = require('../utils/qrcodeGenerator');
+const authorization = require('../middleware/authorization');
+//const generateQRCode = require('../services/utils/qrcodeGenerator');
 
 const userDataStorage = {};
 

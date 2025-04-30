@@ -7,7 +7,7 @@ const cors = require('cors');
 const prisma = require('./prismaClient');
 
 // Prisma error handler
-const prismaErrorHandler = require('./middleware/prismaErrorHandler');
+const prismaErrorHandler = require('./server/src/middleware/prismaErrorHandler');
 
 const app = express();
 
@@ -15,9 +15,9 @@ app.use(cors());
 app.use(express.json());
 
 // Mount your routes
-app.use('/auth',      require('./routes/jwtAuth'));
-app.use('/customers', require('./routes/customers'));
-app.use('/staffs',    require('./routes/staffs'));
+app.use('/auth',      require('./server/src/routes/jwtAuth'));
+app.use('/customers', require('./server/src/routes/customers'));
+app.use('/staffs',    require('./server/src/routes/staffs'));
 
 // Prisma-specific DB errors
 app.use(prismaErrorHandler);

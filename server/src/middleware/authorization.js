@@ -1,5 +1,5 @@
 const jwt = require('jsonwebtoken');
-const prisma = require('../prismaClient');
+const prisma = require('../../../prismaClient');
 require('dotenv').config();
 
 module.exports = async (req, res, next) => {
