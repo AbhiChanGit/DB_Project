@@ -1,6 +1,5 @@
-// frontend/src/context/AuthContext.tsx
 import React, { createContext, useState, ReactNode, FC } from 'react';
-import api from '../api';
+import api from '../api/client';
 
 interface AuthContextType {
   token: string | null;
@@ -17,10 +16,21 @@ interface AuthProviderProps {
 export const AuthProvider: FC<AuthProviderProps> = ({ children }) => {
   const [token, setToken] = useState<string | null>(localStorage.getItem('token'));
 
-  const login = async (email: string, password: string, userType: 'customer' | 'staff') => {
-    const res = await api.post<{ token: string }>('/auth/login', { email, password, type_of_user: userType });
-    localStorage.setItem('token', res.data.token);
-    setToken(res.data.token);
+  const login = async (
+    email: string,
+    password: string,
+    userType: 'customer' | 'staff'
+  ) => {
+    // 1) Send user_type (not type_of_user)  
+    const res = await api.post<{ jwToken: string }>(
+      '/auth/login',
+      { email, password, user_type: userType }
+    );
+
+    // 2) Store jwToken (not data.token)
+    const jwt = res.data.jwToken;
+    localStorage.setItem('token', jwt);
+    setToken(jwt);
   };
 
   const logout = () => {

@@ -1,7 +1,7 @@
 import React, { useState, useContext } from 'react';
 import { Form, Input, Button, Radio, message } from 'antd';
-import { useNavigate } from 'react-router-dom';
-import { AuthContext } from '../context/AuthContext';
+import { useNavigate }                     from 'react-router-dom';
+import { AuthContext }                     from '../context/AuthContext';
 
 export const Login: React.FC = () => {
   const auth = useContext(AuthContext)!;
@@ -12,8 +12,8 @@ export const Login: React.FC = () => {
     try {
       await auth.login(vals.email, vals.password, userType);
       nav('/');
-    } catch {
-      message.error('Login failed');
+    } catch (err: any) {
+      message.error(err.response?.data?.message || 'Login failed');
     }
   };
 
@@ -23,20 +23,25 @@ export const Login: React.FC = () => {
       layout="vertical"
       style={{ maxWidth: 300, margin: 'auto', marginTop: 50 }}
     >
-      <Form.Item name="email" label="Email" rules={[{ required: true }]}>
+      <Form.Item name="email" label="Email" rules={[{ required: true, type: 'email' }]}>
         <Input />
       </Form.Item>
       <Form.Item name="password" label="Password" rules={[{ required: true }]}>
         <Input.Password />
       </Form.Item>
       <Form.Item>
-        <Radio.Group value={userType} onChange={e => setUserType(e.target.value)}>
+        <Radio.Group
+          value={userType}
+          onChange={e => setUserType(e.target.value as 'customer' | 'staff')}
+        >
           <Radio value="customer">Customer</Radio>
           <Radio value="staff">Staff</Radio>
         </Radio.Group>
       </Form.Item>
       <Form.Item>
-        <Button type="primary" htmlType="submit" block>Login</Button>
+        <Button type="primary" htmlType="submit" block>
+          Login
+        </Button>
       </Form.Item>
     </Form>
   );

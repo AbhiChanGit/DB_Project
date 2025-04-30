@@ -1,6 +1,6 @@
 import React from 'react';
 import { Form, Input, Button, message } from 'antd';
-import api from '../api';
+import api from '../api/client';
 
 export const StaffProductManagement: React.FC = () => {
   const [form] = Form.useForm();

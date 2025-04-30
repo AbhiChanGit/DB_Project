@@ -1,7 +1,7 @@
 // frontend/src/pages/CreditCards.tsx
 import React, { useEffect, useState } from 'react';
 import { List, Button, Modal, message } from 'antd';
-import api from '../api';
+import api from '../api/client';
 import { CreditCard } from '../types';
 import { CreditCardForm } from '../components/CreditCardForm';
 

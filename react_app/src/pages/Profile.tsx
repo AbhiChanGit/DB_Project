@@ -1,13 +1,22 @@
 // frontend/src/pages/Profile.tsx
 import React, { useEffect } from 'react';
 import { Form, Input, Button, message } from 'antd';
-import api from '../api';
+import api from '../api/client';
 
 export const Profile: React.FC = () => {
   const [form] = Form.useForm();
 
   useEffect(() => {
-    api.get('/customers/').then(r => form.setFieldsValue(r.data)).catch(() => message.error('Failed to load profile'));
+    api
+      .get('/customers/customer')
+      .then(r => {
+        form.setFieldsValue({
+          email: r.data.email,
+          phone: r.data.phone,
+          // leave password blank on load
+        });
+      })
+      .catch(() => message.error('Failed to load profile'));
   }, []);
 
   const onFinish = async (v: any) => {

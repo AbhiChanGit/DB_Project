@@ -2,7 +2,7 @@
 import React from 'react';
 import { Card, Button, message } from 'antd';
 import { Product } from '../types';
-import api from '../api';
+import api from '../api/client';
 
 export const ProductCard: React.FC<{ product: Product; onAdd?: () => void }> = ({ product, onAdd }) => {
   const addToCart = async () => {

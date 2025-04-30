@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Input, Row, Col } from 'antd';
-import api from '../api';
+import api from '../api/client';
 import { Product } from '../types';
 import { ProductCard } from '../components/ProductCard';
 

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Form, Input, Button, Radio, message } from 'antd';
-import api from '../api';
+import api from '../api/client';
 import { useNavigate } from 'react-router-dom';
 import { SignupValues } from '../types';
 
