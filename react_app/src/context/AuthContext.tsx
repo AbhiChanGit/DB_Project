@@ -21,13 +21,12 @@ export const AuthProvider: FC<AuthProviderProps> = ({ children }) => {
     password: string,
     userType: 'customer' | 'staff'
   ) => {
-    // 1) Send user_type (not type_of_user)  
     const res = await api.post<{ jwToken: string }>(
       '/auth/login',
       { email, password, user_type: userType }
     );
 
-    // 2) Store jwToken (not data.token)
+    // 2) Store the "jwToken" that your API returns
     const jwt = res.data.jwToken;
     localStorage.setItem('token', jwt);
     setToken(jwt);

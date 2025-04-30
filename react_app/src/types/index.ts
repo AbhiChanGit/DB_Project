@@ -39,7 +39,7 @@ export interface SignupValues {
     last_name: string;
     email: string;
     password: string;
-    phone_number: string;
-    type_of_user: 'customer' | 'staff';
+    phone: string;
+    user_type: 'customer' | 'staff';
 }
   

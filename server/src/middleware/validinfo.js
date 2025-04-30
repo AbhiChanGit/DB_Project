@@ -1,3 +1,4 @@
+// server/src/middleware/validinfo.js
 const prisma = require('../../../prismaClient');
 
 module.exports = async (req, res, next) => {
@@ -8,32 +9,58 @@ module.exports = async (req, res, next) => {
     password,
     phone,
     user_type,
+    salary,
+    job_title,
+    hire_date,
   } = req.body;
 
   const validEmail = (e) =>
     /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/.test(e);
 
+  // SIGNUP validation
   if (req.path === '/signup') {
-    // 1. Basic presence checks
+    // presence
     if (![first_name, last_name, email, password, phone, user_type].every(Boolean)) {
-      return res.status(401).json({ status: 'fail', message: 'Missing credentials' });
+      return res
+        .status(400)
+        .json({ status: 'fail', message: 'Missing required signup fields' });
     }
+    // email format
     if (!validEmail(email)) {
-      return res.status(401).json({ status: 'fail', message: 'Invalid email' });
+      return res
+        .status(400)
+        .json({ status: 'fail', message: 'Invalid email address' });
     }
-    // 2. Enforce unique email
-    const existing = await prisma.user.findUnique({ where: { email } });
+    // staff‐only extra fields
+    if (user_type === 'staff') {
+      if (![salary, job_title, hire_date].every(Boolean)) {
+        return res.status(400).json({
+          status: 'fail',
+          message: 'Staff signup missing salary, job_title, or hire_date',
+        });
+      }
+    }
+    const existing = await prisma.user.findUnique({
+      where: { email },
+    });
     if (existing) {
-      return res.status(409).json({ status: 'fail', message: 'Email already in use' });
+      return res
+        .status(409)
+        .json({ status: 'fail', message: 'Email already in use' });
     }
   }
 
+  // LOGIN validation
   if (req.path === '/login') {
     if (![email, password, user_type].every(Boolean)) {
-      return res.status(401).json({ status: 'fail', message: 'Missing credentials' });
+      return res
+        .status(400)
+        .json({ status: 'fail', message: 'Missing login credentials' });
     }
     if (!validEmail(email)) {
-      return res.status(401).json({ status: 'fail', message: 'Invalid email' });
+      return res
+        .status(400)
+        .json({ status: 'fail', message: 'Invalid email address' });
     }
   }
 
