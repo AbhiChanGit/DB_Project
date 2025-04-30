@@ -4,28 +4,26 @@ require('dotenv').config();
 
 module.exports = async (req, res, next) => {
   try {
-    const token = req.header('token');
-    if (!token) {
-      return res.status(403).json({ status: 'fail', message: 'Authorization denied' });
+    const authHeader = req.header('Authorization');
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ status: 'fail', message: 'Authorization denied' });
     }
 
-    // 1. Verify JWT
+    const token = authHeader.split(' ')[1];
     const payload = jwt.verify(token, process.env.jwtSecret);
-    const userId  = payload.user_id;
+    const userId = payload.user.id;
+    console.log('JWT Secret:', process.env.jwtSecret);
 
-    // 2. Fetch user
-    const user = await prisma.user.findUnique({
-      where: { id: userId }
-    });
+    const user = await prisma.user.findUnique({ where: { id: userId } });
     if (!user) {
-      return res.status(403).json({ status: 'fail', message: 'User not found' });
+      return res.status(404).json({ status: 'fail', message: 'User not found' });
     }
+
     req.user = user;
 
-    // 3. If customer, load their customer record
     if (user.user_type === 'customer') {
       const customer = await prisma.customer.findUnique({
-        where: { user_id: userId }
+        where: { customer_id: userId }
       });
       if (!customer) {
         return res.status(404).json({ status: 'fail', message: 'Customer profile missing' });
@@ -33,10 +31,9 @@ module.exports = async (req, res, next) => {
       req.customer = customer;
     }
 
-    // 4. If staff, load their staff record
     if (user.user_type === 'staff') {
       const staff = await prisma.staff.findUnique({
-        where: { user_id: userId }
+        where: { staff_id: userId }
       });
       if (!staff) {
         return res.status(404).json({ status: 'fail', message: 'Staff profile missing' });
@@ -47,6 +44,8 @@ module.exports = async (req, res, next) => {
     next();
   } catch (err) {
     console.error(err);
-    res.status(403).json({ status: 'fail', message: 'Not Authorized' });
+    res.status(401).json({ status: 'fail', message: 'Not Authorized' });
   }
 };
+
+

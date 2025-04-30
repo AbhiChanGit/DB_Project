@@ -4,18 +4,25 @@ const prisma = new PrismaClient();
 
 async function main() {
   // 0. Clean up existing data
-  await prisma.orderItem.deleteMany();
+  await prisma.deliveryPlan.deleteMany();        // depends on order
+  await prisma.orderItem.deleteMany();           // depends on order
   await prisma.order.deleteMany();
-  await prisma.stock.deleteMany();
-  await prisma.warehouse.deleteMany();
-  await prisma.productPrice.deleteMany();
-  await prisma.product.deleteMany();
-  await prisma.category.deleteMany();
-  await prisma.creditCard.deleteMany();
-  await prisma.address.deleteMany();
-  await prisma.staff.deleteMany();
-  await prisma.customer.deleteMany();
-  await prisma.user.deleteMany();
+  
+  await prisma.cartItem.deleteMany();            // depends on product
+  await prisma.supplierProduct.deleteMany();    // <-- NEW
+  await prisma.stock.deleteMany();               // depends on product, warehouse
+  await prisma.warehouse.deleteMany();           // has address
+  await prisma.productPrice.deleteMany();        // depends on product
+  await prisma.product.deleteMany();             // must come after dependents
+  await prisma.category.deleteMany();            // parent of product
+  
+  await prisma.creditCard.deleteMany();          // depends on customer
+  await prisma.address.deleteMany();             // used by users, warehouse
+  await prisma.staff.deleteMany();               // depends on user
+  await prisma.customer.deleteMany();            // depends on user
+  await prisma.user.deleteMany();                // base
+  
+  
 
   // 1. Define seed data
   const users = [
