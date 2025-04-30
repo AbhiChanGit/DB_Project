@@ -1,21 +1,28 @@
-const {Pool} = require('pg');
-const schedule = require('node-schedule')
 require('dotenv').config();
+const schedule = require('node-schedule');
+const prisma = require('./prismaClient');
 
-
-const pool = new Pool();
-module.exports = {
-    query: (text, params) => pool.query(text, params),
-};
-
+// Every minute: delete any verifying records older than 10 minutes
 schedule.scheduleJob('* * * * *', async () => {
-    try {
-        const deleteQuery = "DELETE FROM verifying WHERE NOW() - created_at > interval '10 minutes';";
-        await pool.query(deleteQuery);
-        console.log("Deleted code");
-    } catch (err) {
-        console.error(err.message);
+  try {
+    const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000);
+    const { count } = await prisma.verifying.deleteMany({
+      where: {
+        created_at: { lt: tenMinutesAgo }
+      }
+    });
+    if (count) {
+      console.log(`🗑️  Deleted ${count} old verification code(s)`);
     }
-})
+  } catch (err) {
+    console.error('Error purging verifying table:', err);
+  }
+});
 
-process.stdin.resume();
+// keep the process alive if you run this file directly
+if (require.main === module) {
+  console.log('Verifier cleanup scheduler started');
+  process.stdin.resume();
+}
+
+module.exports = {}; // nothing to export—Prisma client lives in prismaClient.js
