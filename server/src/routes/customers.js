@@ -49,17 +49,19 @@ router.post('/credit_card_create', authorization, async (req, res, next) => {
     const { card_number, card_holder_name, expiry_date, cvv, billing_address_id, is_default } = req.body;
     await prisma.creditCard.create({
       data: {
-        customer_id: req.customer.customer_id, // ✅ make sure this is defined
+        customer: {
+          connect: { customer_id: req.customer.customer_id }
+        },
+        billing_address: {
+          connect: { address_id: billing_address_id }
+        },
         card_number,
         card_holder_name,
         expiry_date: new Date(expiry_date),
         cvv,
-        billing_address: {
-          connect: { id: billing_address_id }
-        },
         is_default
-      },
-    });    
+      }
+    });      
     res.json({ status: 'success', message: 'Credit card created successfully' });
   } catch (err) {
     next(err);
