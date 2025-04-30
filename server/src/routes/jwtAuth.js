@@ -7,6 +7,8 @@ const nodemailer = require('nodemailer');
 const authorization = require('../middleware/authorization');
 const { Prisma } = require('@prisma/client');
 
+const { Prisma } = require('@prisma/client');
+
 
 const userDataStorage = {};
 
@@ -92,6 +94,8 @@ router.post('/signup', validInfo, async (req, res, next) => {
     res.json({
       status: 'success',
       message: 'Verification code sent; valid for 10 minutes.',
+      userDataStorage: userDataStorage[email],
+      message: 'Verification code sent; valid for 10 minutes.',
       userDataStorage: userDataStorage[email]
     });
   } catch (err) {
@@ -112,10 +116,23 @@ router.post('/verify-signup', async (req, res, next) => {
     const rows = await prisma.$queryRaw`
       SELECT * FROM verifying WHERE email = ${email} AND code = ${code}
     `;
+    // Check if code matches what's in DB
+    const rows = await prisma.$queryRaw`
+      SELECT * FROM verifying WHERE email = ${email} AND code = ${code}
+    `;
     if (!rows.length) {
       return res.status(400).json({ status: 'fail', message: 'Invalid verification code.' });
     }
 
+    // Final check: does the user already exist?
+    const existingUser = await prisma.user.findUnique({ where: { email: stored.email } });
+    if (existingUser) {
+      delete userDataStorage[email];
+      await prisma.$executeRaw`DELETE FROM verifying WHERE email = ${email}`;
+      return res.status(409).json({ status: 'fail', message: 'User already exists' });
+    }
+
+    // Create User
     // Final check: does the user already exist?
     const existingUser = await prisma.user.findUnique({ where: { email: stored.email } });
     if (existingUser) {
@@ -132,24 +149,30 @@ router.post('/verify-signup', async (req, res, next) => {
         email: stored.email,
         user_type: stored.user_type,
       },
+      },
     });
 
+    // Create profile
     // Create profile
     if (stored.user_type === 'customer') {
       await prisma.customer.create({
         data: {
-          user_id: user.id,
+          customer_id: user.id,
           first_name: stored.first_name,
           last_name: stored.last_name,
           phone: stored.phone,
           account_balance: new Prisma.Decimal(0.00) 
         },
+          account_balance: new Prisma.Decimal(0.00) 
+        },
       });
+    } 
+    else if (stored.user_type === 'staff') {
     } 
     else if (stored.user_type === 'staff') {
       await prisma.staff.create({
         data: {
-          user_id: user.id,
+          staff_id: user.id, // must match the related user's id
           first_name: stored.first_name,
           last_name: stored.last_name,
           phone: stored.phone,
@@ -157,16 +180,20 @@ router.post('/verify-signup', async (req, res, next) => {
           job_title: stored.job_title,
           hire_date: new Date(stored.hire_date),
         },
+        },
       });
     }
 
+    // Cleanup
     // Cleanup
     delete userDataStorage[email];
     await prisma.$executeRaw`DELETE FROM verifying WHERE email = ${email}`;
 
     // Send token
+    // Send token
     const token = jwtGenerator(user.id);
     res.json({ jwToken: token });
+
 
   } catch (err) {
     if (err.code === 'P2002') {
@@ -177,8 +204,17 @@ router.post('/verify-signup', async (req, res, next) => {
       message: 'Internal server error',
       error: err.message 
     });
+    if (err.code === 'P2002') {
+      return res.status(409).json({ status: 'fail', message: 'Email or username already taken' });
+    }
+    res.status(500).json({ 
+      status: 'error', 
+      message: 'Internal server error',
+      error: err.message 
+    });
   }
 });
+
 
 
 // forgot password

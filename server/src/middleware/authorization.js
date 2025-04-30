@@ -15,13 +15,15 @@ module.exports = async (req, res, next) => {
 
     // 3) Verify & decode
     const payload = jwt.verify(token, process.env.jwtSecret);
-    const userId  = payload.user_id;
+    const userId = payload.user.id;
+    console.log('JWT Secret:', process.env.jwtSecret);
 
     // 4) Fetch the actual user
     const user = await prisma.user.findUnique({ where: { id: userId } });
     if (!user) {
       return res.status(401).json({ status: 'fail', message: 'User not found' });
     }
+
     req.user = user;
 
     // 5) If customer, load their profile
