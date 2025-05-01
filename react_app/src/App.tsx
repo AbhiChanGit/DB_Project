@@ -20,63 +20,13 @@ const App: React.FC = () => (
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<Signup />} />
 
-        <Route
-          path="/"
-          element={
-            <ProtectedRoute>
-              <ProductList />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/cart"
-          element={
-            <ProtectedRoute>
-              <Cart />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/profile"
-          element={
-            <ProtectedRoute>
-              <Profile />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/addresses"
-          element={
-            <ProtectedRoute>
-              <Addresses />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/credit-cards"
-          element={
-            <ProtectedRoute>
-              <CreditCards />
-            </ProtectedRoute>
-          }
-        />
-
-        <Route
-          path="/staff/products"
-          element={
-            <ProtectedRoute>
-              <StaffProductManagement />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/staff/stock"
-          element={
-            <ProtectedRoute>
-              <StaffStockManagement />
-            </ProtectedRoute>
-          }
-        />
+        <Route path="/" element={<ProductList />} />
+        <Route path="/cart" element={<Cart />} />
+        <Route path="/profile" element={<Profile />} />
+        <Route path="/addresses" element={<Addresses />} />
+        <Route path="/credit-cards" element={<CreditCards />} />
+        <Route path="/staff/products" element={<StaffProductManagement />} />
+        <Route path="/staff/stock" element={<StaffStockManagement />} />
       </Routes>
     </BrowserRouter>
   </AuthProvider>

@@ -4,34 +4,68 @@ import api from '../api';
 import { Address } from '../types';
 import { AddressForm } from '../components/AddressForm';
 
+const dummyAddresses: Address[] = [
+  {
+    address_id: 1,
+    user_id: 1,
+    address_type: 'Home',
+    street_address: '123 Main St',
+    city: 'Metropolis',
+    state: 'NY',
+    postal_code: '10001',
+    country: 'USA',
+    is_default: true,
+  },
+  {
+    address_id: 2,
+    user_id: 1,
+    address_type: 'Work',
+    street_address: '456 Oak Ave',
+    city: 'Gotham',
+    state: 'NJ',
+    postal_code: '07001',
+    country: 'USA',
+    is_default: false,
+  },
+];
+
 export const Addresses: React.FC = () => {
   const [addrs, setAddrs] = useState<Address[]>([]);
   const [modal, setModal] = useState(false);
   const [edit, setEdit] = useState<Address | undefined>();
 
   const load = async () => {
-    try {
-      const r = await api.get<Address[]>('/customers/addresses');
-      setAddrs(r.data);
-    } catch {
-      message.error('Failed to load addresses');
-    }
+    // try {
+    //   const r = await api.get<Address[]>('/customers/addresses');
+    //   setAddrs(r.data);
+    // } catch {
+    //   message.error('Failed to load addresses');
+    // }
+    // simulate loading dummy addresses
+    setAddrs(dummyAddresses);
   };
+
   useEffect(() => { load(); }, []);
 
   const save = async (data: any) => {
-    try {
-      if (edit) {
-        await api.put('/customers/address_update', { address_id: edit.address_id, ...data });
-      } else {
-        await api.post('/customers/address_create', data);
-      }
-      setModal(false);
-      setEdit(undefined);
-      load();
-    } catch {
-      message.error('Save failed');
-    }
+    // try {
+    //   if (edit) {
+    //     await api.put('/customers/address_update', { address_id: edit.address_id, ...data });
+    //   } else {
+    //     await api.post('/customers/address_create', data);
+    //   }
+    //   setModal(false);
+    //   setEdit(undefined);
+    //   load();
+    // } catch {
+    //   message.error('Save failed');
+    // }
+    
+    // simulate saving (update local dummy data if needed)
+    setModal(false);
+    setEdit(undefined);
+    load();
+
   };
 
   return (

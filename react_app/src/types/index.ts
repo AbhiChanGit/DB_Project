@@ -14,6 +14,7 @@ export interface CartItem {
   
 export interface Address {
     address_id: number;
+    user_id: number;
     address_type: string;
     street_address: string;
     city: string;
@@ -25,6 +26,7 @@ export interface Address {
   
 export interface CreditCard {
     card_id: number;
+    customer_id: number;
     card_number: string;
     card_holder_name: string;
     expiry_date: string;
