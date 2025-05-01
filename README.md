@@ -6,6 +6,9 @@
 - **Backend**: Node.js/Express
 - **Database**: PostgreSQL (managed via Prisma ORM)
 
+## Project Video
+https://www.youtube.com/watch?v=Ai4cbtMCZEE
+
 It supports two user types:
 
 ### Customers
