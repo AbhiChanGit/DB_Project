@@ -1,4 +1,3 @@
-// server/src/middleware/validinfo.js
 const prisma = require('../../../prismaClient');
 
 module.exports = async (req, res, next) => {
@@ -8,10 +7,7 @@ module.exports = async (req, res, next) => {
     email,
     password,
     phone,
-    user_type,
-    salary,
-    job_title,
-    hire_date,
+    userType,
   } = req.body;
 
   const validEmail = (e) =>
@@ -19,30 +15,20 @@ module.exports = async (req, res, next) => {
 
   // SIGNUP validation
   if (req.path === '/signup') {
-    // presence
-    if (![first_name, last_name, email, password, phone, user_type].every(Boolean)) {
+    // 1) All six fields required
+    if (![first_name, last_name, email, password, phone, userType].every(Boolean)) {
       return res
         .status(400)
         .json({ status: 'fail', message: 'Missing required signup fields' });
     }
-    // email format
+    // 2) Email format
     if (!validEmail(email)) {
       return res
         .status(400)
         .json({ status: 'fail', message: 'Invalid email address' });
     }
-    // staff‐only extra fields
-    if (user_type === 'staff') {
-      if (![salary, job_title, hire_date].every(Boolean)) {
-        return res.status(400).json({
-          status: 'fail',
-          message: 'Staff signup missing salary, job_title, or hire_date',
-        });
-      }
-    }
-    const existing = await prisma.user.findUnique({
-      where: { email },
-    });
+    // 3) No duplicates
+    const existing = await prisma.user.findUnique({ where: { email } });
     if (existing) {
       return res
         .status(409)
@@ -52,7 +38,7 @@ module.exports = async (req, res, next) => {
 
   // LOGIN validation
   if (req.path === '/login') {
-    if (![email, password, user_type].every(Boolean)) {
+    if (![email, password, userType].every(Boolean)) {
       return res
         .status(400)
         .json({ status: 'fail', message: 'Missing login credentials' });

@@ -30,9 +30,11 @@ export const Login: React.FC = () => {
       >
         <Input />
       </Form.Item>
+
       <Form.Item name="password" label="Password" rules={[{ required: true }]}>
         <Input.Password />
       </Form.Item>
+
       <Form.Item>
         <Radio.Group
           value={userType}
@@ -42,6 +44,7 @@ export const Login: React.FC = () => {
           <Radio value="staff">Staff</Radio>
         </Radio.Group>
       </Form.Item>
+
       <Form.Item>
         <Button type="primary" htmlType="submit" block>
           Login

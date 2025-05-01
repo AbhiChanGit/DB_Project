@@ -1,9 +1,19 @@
-import React, { createContext, useState, ReactNode, FC } from 'react';
+import React, {
+  createContext,
+  useState,
+  useEffect,
+  ReactNode,
+  FC
+} from 'react';
 import api from '../api/client';
 
 interface AuthContextType {
-  token: string | null;
-  login: (email: string, password: string, userType: 'customer' | 'staff') => Promise<void>;
+  token:  string | null;
+  login:  (
+    email: string,
+    password: string,
+    userType: 'customer' | 'staff'
+  ) => Promise<void>;
   logout: () => void;
 }
 
@@ -14,26 +24,34 @@ interface AuthProviderProps {
 }
 
 export const AuthProvider: FC<AuthProviderProps> = ({ children }) => {
-  const [token, setToken] = useState<string | null>(localStorage.getItem('token'));
+  const [token, setToken] = useState<string | null>(
+    () => localStorage.getItem('token')
+  );
+
+  useEffect(() => {
+    if (token) {
+      localStorage.setItem('token', token);
+      api.defaults.headers.common.Authorization = `Bearer ${token}`;
+    } else {
+      localStorage.removeItem('token');
+      delete api.defaults.headers.common.Authorization;
+    }
+  }, [token]);
 
   const login = async (
     email: string,
     password: string,
     userType: 'customer' | 'staff'
   ) => {
-    const res = await api.post<{ jwToken: string }>(
-      '/auth/login',
-      { email, password, user_type: userType }
-    );
-
-    // 2) Store the "jwToken" that your API returns
-    const jwt = res.data.jwToken;
-    localStorage.setItem('token', jwt);
-    setToken(jwt);
+    const res = await api.post<{ token: string }>('/auth/login', {
+      email,
+      password,
+      userType,
+    });
+    setToken(res.data.token);
   };
 
   const logout = () => {
-    localStorage.removeItem('token');
     setToken(null);
   };
 
