@@ -1,10 +1,11 @@
-// frontend/src/App.tsx
+// src/App.tsx
 import React from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { ProtectedRoute } from './routes/ProtectedRoute';
 import { Login } from './pages/Login';
 import { Signup } from './pages/Signup';
+import { VerifySignup } from './pages/VerifySignup';
 import { ProductList } from './pages/ProductList';
 import { Cart } from './pages/Cart';
 import { Profile } from './pages/Profile';
@@ -17,8 +18,9 @@ const App: React.FC = () => (
   <AuthProvider>
     <BrowserRouter>
       <Routes>
-        <Route path="/login" element={<Login />} />
+        <Route path="/login"  element={<Login />} />
         <Route path="/signup" element={<Signup />} />
+        <Route path="/verify-signup" element={<VerifySignup />} />
 
         <Route
           path="/"
@@ -77,6 +79,7 @@ const App: React.FC = () => (
             </ProtectedRoute>
           }
         />
+        <Route path="*" element={<div>404: Page not found</div>} />
       </Routes>
     </BrowserRouter>
   </AuthProvider>

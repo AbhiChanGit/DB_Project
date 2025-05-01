@@ -1,7 +1,7 @@
 // frontend/src/pages/StaffStockManagement.tsx
 import React, { useEffect, useState } from 'react';
 import { Form, Select, InputNumber, Button, message } from 'antd';
-import api from '../api';
+import api from '../api/client';
 import { Product } from '../types';
 
 interface Warehouse {

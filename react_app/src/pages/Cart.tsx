@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { List, Button, InputNumber, message } from 'antd';
-import api from '../api';
+import api from '../api/client';
 import { CartItem } from '../types';
 
 export const Cart: React.FC = () => {
