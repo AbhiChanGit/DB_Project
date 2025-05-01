@@ -79,6 +79,6 @@ All database models and seeding scripts reside in the prisma folder:
 > Note: Ensure your PostgreSQL server is running, and the DATABASE_URL in your .env matches its connection string before starting the backend.
 
 #### Contributors
-- Abhishek Chandra: _Chandra6@mail.uc.edu_
-- Shashank Sathiyanarayaanan: _sathiysk@mail.uc.edu_ 
-- Luu Dang: _luudh@mail.uc.edu_
+- Abhishek Chandra: _Chandra6@mail.uc.edu_ Frontend
+- Shashank Sathiyanarayaanan: _sathiysk@mail.uc.edu_ DB and Frontend Backend Connection
+- Luu Dang: _luudh@mail.uc.edu_ Backend
